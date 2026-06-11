@@ -1092,14 +1092,10 @@
         selectedIndex = null;
         tooltipHideTimer = null;
         render();
-      }, 3000);
+      }, 1500);
     }
 
     mainCanvas.addEventListener("pointerdown", event => {
-      selectMainPoint(event.clientX);
-    });
-
-    mainCanvas.addEventListener("pointermove", event => {
       selectMainPoint(event.clientX);
     });
 
