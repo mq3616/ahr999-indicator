@@ -442,6 +442,7 @@
     let dragStartX = 0;
     let dragStartRange = [0, 0];
     let selectedIndex = null;
+    let tooltipHideTimer = null;
 
     function usd(v) {
       if (v >= 10000) return `${Math.round(v / 10000)}万`;
@@ -1070,12 +1071,28 @@
 
     function selectMainPoint(clientX) {
       if (!data.length) return;
+      cancelTooltipHide();
       const rect = mainCanvas.getBoundingClientRect();
       const pad = { l: 54, r: 64 };
       const x = Math.min(rect.width - pad.r, Math.max(pad.l, clientX - rect.left));
       const ratio = (x - pad.l) / Math.max(1, rect.width - pad.l - pad.r);
       selectedIndex = viewStart + Math.round(ratio * (viewEnd - viewStart));
       render();
+    }
+
+    function cancelTooltipHide() {
+      if (!tooltipHideTimer) return;
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+
+    function scheduleTooltipHide() {
+      cancelTooltipHide();
+      tooltipHideTimer = setTimeout(() => {
+        selectedIndex = null;
+        tooltipHideTimer = null;
+        render();
+      }, 3000);
     }
 
     mainCanvas.addEventListener("pointerdown", event => {
@@ -1085,6 +1102,10 @@
     mainCanvas.addEventListener("pointermove", event => {
       selectMainPoint(event.clientX);
     });
+
+    mainCanvas.addEventListener("pointerleave", scheduleTooltipHide);
+    mainCanvas.addEventListener("pointercancel", scheduleTooltipHide);
+    window.addEventListener("blur", scheduleTooltipHide);
 
     miniCanvas.addEventListener("pointerdown", event => {
       if (!data.length) return;
