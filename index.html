@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BTC-AHR999 囤币指标</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111925;
+      --panel: #1a2330;
+      --panel-2: #141d29;
+      --panel-3: #202a38;
+      --text: #eef3f8;
+      --muted: #8e9bac;
+      --line: #2d394b;
+      --ahr: #ffa51f;
+      --btc: #5aa7ff;
+      --fit: #74d35d;
+      --ma: #ef6658;
+      --dca: #817bff;
+      --bottom: #f05a91;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 22px 18px 44px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 25px;
+      font-weight: 680;
+      color: #dfe6ef;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .summary-card {
+      min-width: 0;
+      min-height: 82px;
+      background: linear-gradient(180deg, rgba(18, 33, 51, .95), rgba(18, 31, 48, .72));
+      border: 1px solid #1d3048;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .summary-card .value {
+      font-size: 28px;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.1;
+      color: #e7edf5;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .value-row {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      max-width: 100%;
+    }
+
+    .zone-badge {
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 4px;
+      border: 1px solid currentColor;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      background: rgba(255, 255, 255, .04);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .zone-bottom {
+      color: #74d35d;
+      background: rgba(116, 211, 93, .12);
+    }
+
+    .zone-dca {
+      color: #817bff;
+      background: rgba(129, 123, 255, .12);
+    }
+
+    .zone-danger {
+      color: #ef6658;
+      background: rgba(239, 102, 88, .13);
+    }
+
+    .sentiment-card .value {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-weight: 760;
+    }
+
+    .sentiment-meta {
+      margin-top: 8px;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      gap: 3px;
+      min-height: 22px;
+      width: 100%;
+    }
+
+    .sentiment-bar {
+      width: 8px;
+      border-radius: 2px 2px 0 0;
+      background: #8e9bac;
+      opacity: .9;
+    }
+
+    .sentiment-source {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .sentiment-source:hover {
+      color: #dce5ef;
+      text-decoration: underline;
+    }
+
+    .summary-card .label {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      margin: 0 0 10px;
+      color: #c2cad5;
+      font-size: 14px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .chart-panel {
+      background: var(--panel-2);
+      border-top: 1px solid #1d2836;
+      border-bottom: 1px solid #2b3748;
+      padding: 10px 0 16px;
+      margin: 0 -18px 26px;
+    }
+
+    .chart-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 18px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    #mainChart {
+      height: 420px;
+    }
+
+    #miniChart {
+      height: 76px;
+      margin-top: 8px;
+      cursor: crosshair;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toolbar button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #182231;
+      color: var(--text);
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 22px;
+      font-weight: 720;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .info-card {
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 18px 18px 16px;
+      color: #d2dae5;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .info-card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      font-weight: 720;
+      color: #f1f5f9;
+    }
+
+    .info-card p {
+      margin: 0;
+    }
+
+    .range-note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 720px) {
+      main {
+        padding: 18px 12px 32px;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .summary-card {
+        min-height: 74px;
+      }
+
+      .summary-card .value {
+        font-size: 20px;
+      }
+
+      .value-row {
+        gap: 7px;
+      }
+
+      .zone-badge {
+        font-size: 12px;
+        padding: 3px 7px;
+      }
+
+      .summary-card .label {
+        font-size: 13px;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 9px 10px;
+        font-size: 13px;
+      }
+
+      .chart-panel {
+        margin-left: -12px;
+        margin-right: -12px;
+      }
+
+      .chart-inner {
+        padding: 0 12px;
+      }
+
+      #mainChart {
+        height: 360px;
+      }
+
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 430px) {
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="topbar">
+      <h1>BTC-ahr999囤币指标</h1>
+    </header>
+
+    <section class="summary" aria-label="指标摘要">
+      <div class="summary-card">
+        <div class="value-row">
+          <div class="value" id="currentAhr">--</div>
+          <div class="zone-badge" id="currentZone">--</div>
+        </div>
+        <div class="label">当前ahr999指标</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="theoryRange">0.45-1.2</div>
+        <div class="label">理论定投区间</div>
+      </div>
+      <div class="summary-card sentiment-card">
+        <div class="value-row">
+          <div class="value" id="sentimentValue">--</div>
+          <div class="zone-badge" id="sentimentZone">加载中</div>
+        </div>
+        <div class="sentiment-meta" id="sentimentBars" aria-hidden="true"></div>
+        <div class="label" id="sentimentDate">市场情绪指数</div>
+      </div>
+    </section>
+
+    <section class="chart-panel">
+      <div class="chart-inner">
+        <div class="legend" aria-label="图例">
+          <span><i class="dot" style="background:var(--ahr)"></i>ahr999</span>
+          <span><i class="dot" style="background:var(--btc)"></i>BTC全球指数</span>
+          <span><i class="dot" style="background:var(--ma)"></i>200日定投成本</span>
+          <span><i class="dot" style="background:var(--dca)"></i>定投线</span>
+          <span><i class="dot" style="background:var(--bottom)"></i>抄底线</span>
+        </div>
+
+        <canvas id="mainChart"></canvas>
+        <canvas id="miniChart"></canvas>
+
+        <div class="toolbar">
+          <span id="rangeText">拖动下方窗口查看时间区域</span>
+          <button id="resetBtn" type="button">重置范围</button>
+        </div>
+        <p class="range-note" id="sourceText">正在加载数据...</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">指标说明</h2>
+      <div class="info-grid">
+        <article class="info-card">
+          <h2>指标含义</h2>
+          <p>AHR999 囤币指标由微博用户 ahr999 创建，辅助比特币定投用户结合择机策略做出投资决策。该指标隐含了比特币短期定投的收益率，以及比特币价格与预期估值的偏离度。</p>
+        </article>
+        <article class="info-card">
+          <h2>数据说明</h2>
+          <p>页面优先用本地 BTC 日线缓存计算 200 日定投成本和 AHR999；打开页面时会自动补齐缓存最后日期到今天之间的 BTC 日线，并保存到浏览器本地缓存。</p>
+        </article>
+        <article class="info-card">
+          <h2>区间规则</h2>
+          <p>AHR999 小于 0.45 常被视为抄底区；0.45 到 1.2 为理论定投区；1.2 以上逐步转为观望；极高位置应进入止盈复核，而不是继续加仓。</p>
+        </article>
+        <article class="info-card">
+          <h2>使用边界</h2>
+          <p>该指标适合判断 BTC 长周期估值温度，不适合预测短线涨跌，也不直接适用于 ETH、SOL 或股票代币。实际交易还要结合仓位、现金和退出纪律。</p>
+        </article>
+        <article class="info-card">
+          <h2>情绪指数</h2>
+          <p>市场情绪指数来自 <a class="sentiment-source" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noreferrer">Alternative.me Crypto Fear & Greed Index</a>，数值范围为 0 到 100，越低代表越恐惧，越高代表越贪婪。该数据用于辅助观察市场温度，不单独构成交易信号。</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="./data/btc-price-history.js"></script>
+  <script>
+    const START_DATE = Date.UTC(2009, 0, 3);
+    const LIVE_CACHE_KEY = "ahr999-live-btc-price-history-v1";
+    const DAY = 86400000;
+    const mainCanvas = document.getElementById("mainChart");
+    const miniCanvas = document.getElementById("miniChart");
+    const currentAhrEl = document.getElementById("currentAhr");
+    const currentZoneEl = document.getElementById("currentZone");
+    const sentimentValueEl = document.getElementById("sentimentValue");
+    const sentimentZoneEl = document.getElementById("sentimentZone");
+    const sentimentDateEl = document.getElementById("sentimentDate");
+    const sentimentBarsEl = document.getElementById("sentimentBars");
+    const rangeTextEl = document.getElementById("rangeText");
+    const sourceTextEl = document.getElementById("sourceText");
+    const resetBtn = document.getElementById("resetBtn");
+
+    let data = [];
+    let viewStart = 0;
+    let viewEnd = 0;
+    let dragMode = null;
+    let dragStartX = 0;
+    let dragStartRange = [0, 0];
+    let selectedIndex = null;
+
+    function usd(v) {
+      if (v >= 10000) return `${Math.round(v / 10000)}万`;
+      return Math.round(v).toLocaleString("en-US");
+    }
+
+    function priceAxisLabel(v) {
+      if (v >= 100000) return `${Math.round(v / 10000)}万`;
+      return String(Math.round(v));
+    }
+
+    function niceStep(rawStep) {
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const normalized = rawStep / magnitude;
+      if (normalized <= 1) return magnitude;
+      if (normalized <= 2) return 2 * magnitude;
+      if (normalized <= 2.5) return 2.5 * magnitude;
+      if (normalized <= 5) return 5 * magnitude;
+      return 10 * magnitude;
+    }
+
+    function priceAxis(maxPrice) {
+      const step = niceStep(maxPrice / 9);
+      const max = Math.ceil(maxPrice / step) * step;
+      const ticks = [];
+      for (let v = 0; v <= max + step * 0.1; v += step) ticks.push(v);
+      return { min: 0, max, ticks };
+    }
+
+    function zoneForAhr(value) {
+      if (value < 0.45) return { label: "抄底区间", className: "zone-bottom" };
+      if (value <= 1.2) return { label: "定投区间", className: "zone-dca" };
+      return { label: "观望区间", className: "zone-danger" };
+    }
+
+    function sentimentZone(value) {
+      if (value <= 24) return { label: "极度恐惧", color: "#74d35d", className: "zone-bottom" };
+      if (value <= 44) return { label: "恐惧", color: "#9bdc72", className: "zone-bottom" };
+      if (value <= 55) return { label: "中性", color: "#817bff", className: "zone-dca" };
+      if (value <= 75) return { label: "贪婪", color: "#ffa51f", className: "zone-danger" };
+      return { label: "极度贪婪", color: "#ef6658", className: "zone-danger" };
+    }
+
+    function dateLabel(t) {
+      return new Date(t).toISOString().slice(0, 10);
+    }
+
+    function coinAgeDays(t) {
+      return Math.max(1, Math.round((t - START_DATE) / 86400000));
+    }
+
+    function growthValue(t) {
+      const age = coinAgeDays(t);
+      return Math.pow(10, 5.84 * Math.log10(age) - 17.01);
+    }
+
+    function movingAverage(items, index, windowSize) {
+      const start = Math.max(0, index - windowSize + 1);
+      let total = 0;
+      for (let i = start; i <= index; i += 1) total += items[i].price;
+      return total / (index - start + 1);
+    }
+
+    function buildSeries(prices) {
+      return prices.map((item, index, arr) => {
+        const ma200 = movingAverage(arr, index, 200);
+        const fit = growthValue(item.t);
+        const ahr999 = (item.price / ma200) * (item.price / fit);
+        return { ...item, ma200, fit, ahr999 };
+      });
+    }
+
+    function demoPrices() {
+      const anchors = [
+        ["2024-12-07", 101000],
+        ["2025-01-15", 94000],
+        ["2025-03-20", 78000],
+        ["2025-06-01", 108000],
+        ["2025-08-13", 123000],
+        ["2025-10-06", 126000],
+        ["2025-11-25", 92000],
+        ["2026-02-25", 61000],
+        ["2026-05-10", 78000],
+        ["2026-06-11", 61162]
+      ].map(([d, p]) => ({ t: Date.parse(`${d}T00:00:00Z`), price: p }));
+      const start = anchors[0].t;
+      const end = anchors[anchors.length - 1].t;
+      const out = [];
+      for (let t = start; t <= end; t += 86400000) {
+        let a = anchors[0];
+        let b = anchors[anchors.length - 1];
+        for (let i = 0; i < anchors.length - 1; i += 1) {
+          if (t >= anchors[i].t && t <= anchors[i + 1].t) {
+            a = anchors[i];
+            b = anchors[i + 1];
+            break;
+          }
+        }
+        const k = b.t === a.t ? 0 : (t - a.t) / (b.t - a.t);
+        const wave = Math.sin((t - start) / 86400000 / 5) * 0.035 + Math.sin((t - start) / 86400000 / 17) * 0.025;
+        const price = a.price + (b.price - a.price) * k;
+        out.push({ t, price: Math.max(1000, price * (1 + wave)) });
+      }
+      return out;
+    }
+
+    async function loadData() {
+      const cached = window.BTC_PRICE_HISTORY && Array.isArray(window.BTC_PRICE_HISTORY.prices)
+        ? window.BTC_PRICE_HISTORY.prices
+        : null;
+      const basePrices = cached
+        ? cached.map(row => ({ t: Number(row[0]), price: Number(row[1]) })).filter(item => Number.isFinite(item.price))
+        : demoPrices();
+      const prices = mergePrices(basePrices, readLiveCache());
+      data = buildSeries(prices);
+      resetViewAfterDataChange();
+      updateSourceText(cached, "正在检查今日 BTC 价格缺口...");
+      render();
+
+      try {
+        const latestBeforeFetch = data[data.length - 1].t;
+        const livePrices = await fetchMissingPrices(latestBeforeFetch);
+        if (livePrices.length) {
+          const mergedLiveCache = mergePrices(readLiveCache(), livePrices);
+          writeLiveCache(mergedLiveCache);
+          data = buildSeries(mergePrices(basePrices, mergedLiveCache));
+          resetViewAfterDataChange();
+          updateSourceText(cached, `已自动补齐 ${livePrices.length} 天最新 BTC 日线。`);
+          render();
+        } else {
+          updateSourceText(cached, "已是最新日线。");
+        }
+      } catch (error) {
+        updateSourceText(cached, `最新 BTC 日线补齐失败：${error.message}`);
+      }
+    }
+
+    async function loadSentiment() {
+      try {
+        const json = await fetchJson("https://api.alternative.me/fng/?limit=10");
+        if (!Array.isArray(json.data) || !json.data.length) throw new Error("Alternative.me 返回为空");
+        const rows = json.data
+          .map(row => ({
+            value: Number(row.value),
+            timestamp: Number(row.timestamp) * 1000
+          }))
+          .filter(row => Number.isFinite(row.value) && Number.isFinite(row.timestamp));
+        if (!rows.length) throw new Error("Alternative.me 数据格式异常");
+        const latest = rows[0];
+        const zone = sentimentZone(latest.value);
+        sentimentValueEl.textContent = String(latest.value);
+        sentimentZoneEl.textContent = zone.label;
+        sentimentZoneEl.className = `zone-badge ${zone.className}`;
+        sentimentDateEl.textContent = `市场情绪指数 · ${dateLabel(latest.timestamp)}`;
+        drawSentimentBars(rows.slice().reverse());
+      } catch (error) {
+        sentimentValueEl.textContent = "--";
+        sentimentZoneEl.textContent = "获取失败";
+        sentimentZoneEl.className = "zone-badge zone-danger";
+        sentimentDateEl.textContent = `市场情绪指数 · ${error.message}`;
+        sentimentBarsEl.textContent = "";
+      }
+    }
+
+    function drawSentimentBars(rows) {
+      sentimentBarsEl.textContent = "";
+      rows.forEach(row => {
+        const zone = sentimentZone(row.value);
+        const bar = document.createElement("span");
+        bar.className = "sentiment-bar";
+        bar.style.height = `${Math.max(4, Math.round(row.value / 100 * 22))}px`;
+        bar.style.background = zone.color;
+        bar.title = `${dateLabel(row.timestamp)} ${row.value}`;
+        sentimentBarsEl.appendChild(bar);
+      });
+    }
+
+    function resetViewAfterDataChange() {
+      const oldSelectedDate = selectedIndex === null || !data[selectedIndex] ? null : data[selectedIndex].t;
+      const latest = data[data.length - 1];
+      const zone = zoneForAhr(latest.ahr999);
+      currentAhrEl.textContent = latest.ahr999.toFixed(4);
+      currentZoneEl.textContent = zone.label;
+      currentZoneEl.className = `zone-badge ${zone.className}`;
+      viewEnd = data.length - 1;
+      viewStart = defaultRecentStart();
+      if (oldSelectedDate !== null) {
+        const nextSelected = data.findIndex(item => item.t >= oldSelectedDate);
+        selectedIndex = nextSelected === -1 ? null : nextSelected;
+      }
+      applyInitialSelection();
+    }
+
+    function updateSourceText(hasStaticCache, suffix) {
+      const latest = data[data.length - 1];
+      const staticSource = hasStaticCache ? window.BTC_PRICE_HISTORY.source : "内置演示曲线";
+      sourceTextEl.textContent = `数据源：${staticSource} + 打开页面自动补齐最新日线；范围 ${dateLabel(data[0].t)} 至 ${dateLabel(latest.t)}。${suffix}`;
+    }
+
+    function mergePrices(...groups) {
+      const map = new Map();
+      groups.flat().forEach(item => {
+        const t = Number(item.t);
+        const price = Number(item.price);
+        if (!Number.isFinite(t) || !Number.isFinite(price) || price <= 0) return;
+        map.set(dayStart(t), { t: dayStart(t), price });
+      });
+      return [...map.values()].sort((a, b) => a.t - b.t);
+    }
+
+    function readLiveCache() {
+      try {
+        const raw = localStorage.getItem(LIVE_CACHE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map(row => ({ t: Number(row[0]), price: Number(row[1]) }));
+      } catch {
+        return [];
+      }
+    }
+
+    function writeLiveCache(items) {
+      try {
+        localStorage.setItem(
+          LIVE_CACHE_KEY,
+          JSON.stringify(items.map(item => [item.t, Number(item.price.toFixed(8))]))
+        );
+      } catch {
+        // localStorage may be unavailable for some file:// browser settings.
+      }
+    }
+
+    function dayStart(t) {
+      const d = new Date(t);
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+
+    function todayStart() {
+      const now = new Date();
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    }
+
+    async function fetchMissingPrices(latestTimestamp) {
+      const from = dayStart(latestTimestamp) + DAY;
+      const to = todayStart();
+      if (from > to) return [];
+      const providers = [fetchFromKraken, fetchFromBinance, fetchFromCoinGecko];
+      const errors = [];
+      for (const provider of providers) {
+        try {
+          const result = await provider(from, to);
+          if (result.length) return result;
+        } catch (error) {
+          errors.push(error.message);
+        }
+      }
+      throw new Error(errors.join("；") || "没有可用数据源");
+    }
+
+    async function fetchFromKraken(from, to) {
+      const url = new URL("https://api.kraken.com/0/public/OHLC");
+      url.searchParams.set("pair", "XBTUSD");
+      url.searchParams.set("interval", "1440");
+      url.searchParams.set("since", String(Math.floor(from / 1000)));
+      const json = await fetchJson(url);
+      if (!json || !json.result || json.error?.length) throw new Error("Kraken 返回格式异常");
+      const key = Object.keys(json.result).find(name => Array.isArray(json.result[name]));
+      if (!key) throw new Error("Kraken 未返回日线");
+      return json.result[key]
+        .map(row => ({ t: dayStart(Number(row[0]) * 1000), price: Number(row[4]) }))
+        .filter(item => item.t >= from && item.t <= to && Number.isFinite(item.price) && item.price > 0);
+    }
+
+    async function fetchFromBinance(from, to) {
+      const url = new URL("https://api.binance.com/api/v3/klines");
+      url.searchParams.set("symbol", "BTCUSDT");
+      url.searchParams.set("interval", "1d");
+      url.searchParams.set("startTime", String(from));
+      url.searchParams.set("endTime", String(to + DAY - 1));
+      url.searchParams.set("limit", "1000");
+      const rows = await fetchJson(url);
+      if (!Array.isArray(rows)) throw new Error("Binance 返回格式异常");
+      return rows
+        .map(row => ({ t: dayStart(Number(row[0])), price: Number(row[4]) }))
+        .filter(item => item.t >= from && item.t <= to && Number.isFinite(item.price) && item.price > 0);
+    }
+
+    async function fetchFromCoinGecko(from, to) {
+      const url = new URL("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range");
+      url.searchParams.set("vs_currency", "usd");
+      url.searchParams.set("from", String(Math.floor(from / 1000)));
+      url.searchParams.set("to", String(Math.floor((to + DAY - 1) / 1000)));
+      const json = await fetchJson(url);
+      if (!Array.isArray(json.prices)) throw new Error("CoinGecko 返回格式异常");
+      const daily = new Map();
+      json.prices.forEach(([t, price]) => {
+        const day = dayStart(Number(t));
+        if (day >= from && day <= to && Number.isFinite(Number(price))) {
+          daily.set(day, { t: day, price: Number(price) });
+        }
+      });
+      return [...daily.values()].sort((a, b) => a.t - b.t);
+    }
+
+    async function fetchJson(url) {
+      const target = typeof url === "string" ? new URL(url) : url;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+      try {
+        const response = await fetch(target.toString(), { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error(`${target.hostname} HTTP ${response.status}`);
+        return response.json();
+      } catch (error) {
+        if (error.name === "AbortError") throw new Error(`${target.hostname} 请求超时`);
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function applyInitialSelection() {
+      const params = new URLSearchParams(window.location.search);
+      const selectDate = params.get("select");
+      if (!selectDate) return;
+      const target = Date.parse(`${selectDate}T00:00:00Z`);
+      if (!Number.isFinite(target)) return;
+      const idx = data.findIndex(item => item.t >= target);
+      if (idx === -1) return;
+      selectedIndex = idx;
+      if (idx < viewStart || idx > viewEnd) {
+        viewStart = Math.max(0, idx - 180);
+        viewEnd = Math.min(data.length - 1, idx + 185);
+      }
+    }
+
+    function defaultRecentStart() {
+      if (!data.length) return 0;
+      const latest = data[data.length - 1].t;
+      const oneYearAgo = latest - 365 * 86400000;
+      const idx = data.findIndex(item => item.t >= oneYearAgo);
+      return idx === -1 ? Math.max(0, data.length - 366) : idx;
+    }
+
+    function canvasContext(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: rect.width, h: rect.height };
+    }
+
+    function logScale(value, min, max, top, height) {
+      const lv = Math.log10(Math.max(value, 0.00001));
+      const lmin = Math.log10(min);
+      const lmax = Math.log10(max);
+      return top + height - ((lv - lmin) / (lmax - lmin)) * height;
+    }
+
+    function linearScale(value, min, max, top, height) {
+      return top + height - ((value - min) / (max - min)) * height;
+    }
+
+    function drawMain() {
+      const { ctx, w, h } = canvasContext(mainCanvas);
+      const pad = { l: 54, r: 64, t: 24, b: 34 };
+      const plotW = w - pad.l - pad.r;
+      const plotH = h - pad.t - pad.b;
+      const visible = data.slice(viewStart, viewEnd + 1);
+      const axis = priceAxis(Math.max(...data.map(d => d.price)));
+      const priceMin = axis.min;
+      const priceMax = axis.max;
+      const ahrMin = 0.03;
+      const ahrMax = 10;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#141d29";
+      ctx.fillRect(0, 0, w, h);
+
+      const x = i => pad.l + (plotW * i) / Math.max(1, visible.length - 1);
+      const yAhr = v => logScale(v, ahrMin, ahrMax, pad.t, plotH);
+      const yPrice = v => linearScale(v, priceMin, priceMax, pad.t, plotH);
+
+      const yTop = yAhr(0.45);
+      const yBottom = yAhr(0.03);
+      ctx.fillStyle = "rgba(240,90,145,.24)";
+      ctx.fillRect(pad.l, yTop, plotW, yBottom - yTop);
+
+      [0.1, 1, 10].forEach(v => {
+        const y = yAhr(v);
+        ctx.strokeStyle = "rgba(226,232,240,.18)";
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(w - pad.r, y);
+        ctx.stroke();
+        ctx.fillStyle = "#8e9bac";
+        ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI";
+        ctx.fillText(String(v), 8, y + 4);
+      });
+
+      axis.ticks.filter(v => v > 0).forEach(v => {
+        const y = yPrice(v);
+        ctx.fillStyle = "#728094";
+        ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI";
+        ctx.fillText(priceAxisLabel(v), w - pad.r + 12, y + 4);
+      });
+
+      function line(getY, color, width, dash = []) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        visible.forEach((d, i) => {
+          const xx = x(i);
+          const yy = getY(d);
+          if (i === 0) ctx.moveTo(xx, yy);
+          else ctx.lineTo(xx, yy);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      line(d => yPrice(d.price), getCss("--btc"), 2.5);
+      line(d => yPrice(d.ma200), getCss("--ma"), 2.3);
+      line(d => yAhr(d.ahr999), getCss("--ahr"), 2.8);
+
+      [{ v: 1.2, c: getCss("--dca") }, { v: 0.45, c: getCss("--bottom") }].forEach(mark => {
+        const y = yAhr(mark.v);
+        ctx.strokeStyle = mark.c;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(w - pad.r, y);
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = "#77849a";
+      ctx.font = "13px -apple-system, BlinkMacSystemFont, Segoe UI";
+      const ticks = [0, Math.floor((visible.length - 1) / 2), visible.length - 1];
+      ticks.forEach(i => {
+        const label = dateLabel(visible[i].t);
+        ctx.fillText(label, x(i) - 36, h - 10);
+      });
+
+      drawTooltip(ctx, w, h, pad, plotW, selectedIndex, visible, x, yAhr, yPrice);
+    }
+
+    function drawTooltip(ctx, w, h, pad, plotW, index, visible, x, yAhr, yPrice) {
+      if (index === null || index < viewStart || index > viewEnd) return;
+      const localIndex = index - viewStart;
+      const item = visible[localIndex];
+      if (!item) return;
+
+      const xx = x(localIndex);
+      ctx.save();
+      ctx.strokeStyle = "rgba(120,136,158,.35)";
+      ctx.setLineDash([5, 7]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(xx, pad.t);
+      ctx.lineTo(xx, h - pad.b);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const points = [
+        { y: yAhr(item.ahr999), c: getCss("--ahr") },
+        { y: yPrice(item.price), c: getCss("--btc") },
+        { y: yPrice(item.ma200), c: getCss("--ma") },
+        { y: yAhr(1.2), c: getCss("--dca") },
+        { y: yAhr(0.45), c: getCss("--bottom") }
+      ];
+      points.forEach(point => {
+        ctx.fillStyle = point.c;
+        ctx.beginPath();
+        ctx.arc(xx, point.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      const rows = [
+        { text: dateLabel(item.t), color: null },
+        { text: `ahr999:${item.ahr999.toFixed(4)}`, color: getCss("--ahr"), zone: zoneForAhr(item.ahr999) },
+        { text: `BTC全球指数:$${item.price.toFixed(2)}`, color: getCss("--btc") },
+        { text: `200日定投成本:${item.ma200.toFixed(2)}`, color: getCss("--ma") }
+      ];
+      const boxW = 276;
+      const lineH = 25;
+      const boxH = 22 + rows.length * lineH;
+      let boxX = xx + 14;
+      if (boxX + boxW > w - pad.r) boxX = xx - boxW - 14;
+      boxX = Math.max(pad.l + 4, Math.min(boxX, w - pad.r - boxW));
+      const boxY = Math.max(pad.t + 8, Math.min(yAhr(1.2) - 108, h - pad.b - boxH - 8));
+
+      ctx.fillStyle = "rgba(20,29,41,.96)";
+      ctx.strokeStyle = "rgba(45,116,219,.9)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, boxX, boxY, boxW, boxH, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = "18px -apple-system, BlinkMacSystemFont, Segoe UI";
+      ctx.fillStyle = "#dce5ef";
+      rows.forEach((row, i) => {
+        const y = boxY + 25 + i * lineH;
+        if (row.color) {
+          ctx.fillStyle = row.color;
+          ctx.beginPath();
+          ctx.arc(boxX + 15, y - 5, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#dce5ef";
+          ctx.fillText(row.text, boxX + 30, y);
+          if (row.zone) {
+            drawCanvasBadge(ctx, row.zone.label, boxX + 162, y - 19, zoneColor(row.zone.className));
+          }
+        } else {
+          ctx.fillText(row.text, boxX + 10, y);
+        }
+      });
+      ctx.restore();
+    }
+
+    function zoneColor(className) {
+      if (className === "zone-bottom") return "#74d35d";
+      if (className === "zone-danger") return "#ef6658";
+      return "#817bff";
+    }
+
+    function drawCanvasBadge(ctx, text, x, y, color) {
+      ctx.save();
+      ctx.font = "13px -apple-system, BlinkMacSystemFont, Segoe UI";
+      const w = Math.ceil(ctx.measureText(text).width) + 14;
+      const h = 22;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = hexToRgba(color, 0.13);
+      ctx.lineWidth = 1;
+      roundRect(ctx, x, y, w, h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = "700 13px -apple-system, BlinkMacSystemFont, Segoe UI";
+      ctx.fillText(text, x + 7, y + 15);
+      ctx.restore();
+    }
+
+    function hexToRgba(hex, alpha) {
+      const clean = hex.replace("#", "");
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+
+    function drawMini() {
+      const { ctx, w, h } = canvasContext(miniCanvas);
+      const pad = { l: 8, r: 8, t: 8, b: 8 };
+      const plotW = w - pad.l - pad.r;
+      const plotH = h - pad.t - pad.b;
+      const prices = data.map(d => d.price);
+      const min = Math.min(...prices) * 0.95;
+      const max = Math.max(...prices) * 1.05;
+      const x = i => pad.l + (plotW * i) / Math.max(1, data.length - 1);
+      const y = v => pad.t + plotH - ((v - min) / (max - min)) * plotH;
+      const left = x(viewStart);
+      const right = x(viewEnd);
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#0f1722";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(90,167,255,.28)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        if (i === 0) ctx.moveTo(x(i), y(d.price));
+        else ctx.lineTo(x(i), y(d.price));
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(0,0,0,.38)";
+      ctx.fillRect(pad.l, pad.t, Math.max(0, left - pad.l), plotH);
+      ctx.fillRect(right, pad.t, Math.max(0, w - pad.r - right), plotH);
+
+      ctx.strokeStyle = "#dbe7f5";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(left, pad.t, right - left, plotH);
+      [left, right].forEach(pos => {
+        ctx.fillStyle = "#dbe7f5";
+        ctx.fillRect(pos - 5, pad.t + 14, 10, plotH - 28);
+        ctx.fillStyle = "#233044";
+        ctx.fillRect(pos - 1, pad.t + 20, 2, plotH - 40);
+      });
+    }
+
+    function getCss(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function render() {
+      if (!data.length) return;
+      drawMain();
+      drawMini();
+      rangeTextEl.textContent = `${dateLabel(data[viewStart].t)} 至 ${dateLabel(data[viewEnd].t)} · ${viewEnd - viewStart + 1} 天`;
+    }
+
+    function indexFromMiniX(clientX) {
+      const rect = miniCanvas.getBoundingClientRect();
+      const x = Math.min(rect.width - 8, Math.max(8, clientX - rect.left));
+      const ratio = (x - 8) / Math.max(1, rect.width - 16);
+      return Math.round(ratio * (data.length - 1));
+    }
+
+    function selectMainPoint(clientX) {
+      if (!data.length) return;
+      const rect = mainCanvas.getBoundingClientRect();
+      const pad = { l: 54, r: 64 };
+      const x = Math.min(rect.width - pad.r, Math.max(pad.l, clientX - rect.left));
+      const ratio = (x - pad.l) / Math.max(1, rect.width - pad.l - pad.r);
+      selectedIndex = viewStart + Math.round(ratio * (viewEnd - viewStart));
+      render();
+    }
+
+    mainCanvas.addEventListener("pointerdown", event => {
+      selectMainPoint(event.clientX);
+    });
+
+    mainCanvas.addEventListener("pointermove", event => {
+      selectMainPoint(event.clientX);
+    });
+
+    miniCanvas.addEventListener("pointerdown", event => {
+      if (!data.length) return;
+      miniCanvas.setPointerCapture(event.pointerId);
+      const idx = indexFromMiniX(event.clientX);
+      const range = viewEnd - viewStart;
+      if (Math.abs(idx - viewStart) < Math.max(8, range * 0.06)) dragMode = "left";
+      else if (Math.abs(idx - viewEnd) < Math.max(8, range * 0.06)) dragMode = "right";
+      else if (idx > viewStart && idx < viewEnd) dragMode = "move";
+      else {
+        dragMode = idx < viewStart ? "left" : "right";
+      }
+      dragStartX = idx;
+      dragStartRange = [viewStart, viewEnd];
+    });
+
+    miniCanvas.addEventListener("pointermove", event => {
+      if (!dragMode) return;
+      const idx = indexFromMiniX(event.clientX);
+      const minWindow = 14;
+      if (dragMode === "left") {
+        viewStart = Math.max(0, Math.min(idx, viewEnd - minWindow));
+      } else if (dragMode === "right") {
+        viewEnd = Math.min(data.length - 1, Math.max(idx, viewStart + minWindow));
+      } else {
+        const delta = idx - dragStartX;
+        const size = dragStartRange[1] - dragStartRange[0];
+        let nextStart = dragStartRange[0] + delta;
+        nextStart = Math.max(0, Math.min(nextStart, data.length - 1 - size));
+        viewStart = nextStart;
+        viewEnd = nextStart + size;
+      }
+      render();
+    });
+
+    miniCanvas.addEventListener("pointerup", () => {
+      dragMode = null;
+    });
+
+    miniCanvas.addEventListener("pointercancel", () => {
+      dragMode = null;
+    });
+
+    resetBtn.addEventListener("click", () => {
+      viewEnd = data.length - 1;
+      viewStart = defaultRecentStart();
+      selectedIndex = null;
+      render();
+    });
+
+    window.addEventListener("resize", render);
+    loadData();
+    loadSentiment();
+  </script>
+</body>
+</html>
