@@ -443,6 +443,7 @@
     let dragStartRange = [0, 0];
     let selectedIndex = null;
     let tooltipHideTimer = null;
+    let mainPointerActive = false;
 
     function usd(v) {
       if (v >= 10000) return `${Math.round(v / 10000)}万`;
@@ -1096,11 +1097,27 @@
     }
 
     mainCanvas.addEventListener("pointerdown", event => {
+      mainPointerActive = true;
+      mainCanvas.setPointerCapture(event.pointerId);
       selectMainPoint(event.clientX);
     });
 
-    mainCanvas.addEventListener("pointerleave", scheduleTooltipHide);
-    mainCanvas.addEventListener("pointercancel", scheduleTooltipHide);
+    mainCanvas.addEventListener("pointermove", event => {
+      if (!mainPointerActive) return;
+      selectMainPoint(event.clientX);
+    });
+
+    mainCanvas.addEventListener("pointerup", event => {
+      mainPointerActive = false;
+      if (mainCanvas.hasPointerCapture(event.pointerId)) mainCanvas.releasePointerCapture(event.pointerId);
+      scheduleTooltipHide();
+    });
+
+    mainCanvas.addEventListener("pointercancel", event => {
+      mainPointerActive = false;
+      if (mainCanvas.hasPointerCapture(event.pointerId)) mainCanvas.releasePointerCapture(event.pointerId);
+      scheduleTooltipHide();
+    });
     window.addEventListener("blur", scheduleTooltipHide);
 
     miniCanvas.addEventListener("pointerdown", event => {
