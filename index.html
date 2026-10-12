@@ -385,7 +385,10 @@
 
         <div class="toolbar">
           <span id="rangeText">拖动下方窗口查看时间区域</span>
-          <button id="resetBtn" type="button">重置范围</button>
+          <span>
+            <button id="refreshBtn" type="button">刷新价格</button>
+            <button id="resetBtn" type="button">重置范围</button>
+          </span>
         </div>
         <p class="range-note" id="sourceText">正在加载数据...</p>
       </div>
@@ -400,7 +403,7 @@
         </article>
         <article class="info-card">
           <h2>数据说明</h2>
-          <p>页面优先用本地 BTC 日线缓存计算 200 日定投成本和 AHR999；打开页面时会自动补齐缓存最后日期到今天之间的 BTC 日线，并保存到浏览器本地缓存。</p>
+          <p>页面优先用本地 BTC 日线缓存计算 200 日定投成本和 AHR999；打开页面时会补齐缺失日线，并重新获取昨日和今日价格；页面可见时每分钟自动更新，支持手动刷新。今日数据为尚未收盘的日线价格，并保存到浏览器本地缓存。</p>
         </article>
         <article class="info-card">
           <h2>区间规则</h2>
@@ -423,6 +426,7 @@
     const START_DATE = Date.UTC(2009, 0, 3);
     const LIVE_CACHE_KEY = "ahr999-live-btc-price-history-v1";
     const DAY = 86400000;
+    const REFRESH_INTERVAL = 60000;
     const mainCanvas = document.getElementById("mainChart");
     const miniCanvas = document.getElementById("miniChart");
     const currentAhrEl = document.getElementById("currentAhr");
@@ -434,6 +438,8 @@
     const rangeTextEl = document.getElementById("rangeText");
     const sourceTextEl = document.getElementById("sourceText");
     const resetBtn = document.getElementById("resetBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    let priceRefreshInFlight = false;
 
     let data = [];
     let viewStart = 0;
@@ -551,33 +557,42 @@
     }
 
     async function loadData() {
+      if (priceRefreshInFlight) return;
+      priceRefreshInFlight = true;
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = "刷新中...";
       const cached = window.BTC_PRICE_HISTORY && Array.isArray(window.BTC_PRICE_HISTORY.prices)
         ? window.BTC_PRICE_HISTORY.prices
         : null;
       const basePrices = cached
         ? cached.map(row => ({ t: Number(row[0]), price: Number(row[1]) })).filter(item => Number.isFinite(item.price))
         : demoPrices();
-      const prices = mergePrices(basePrices, readLiveCache());
-      data = buildSeries(prices);
-      resetViewAfterDataChange();
-      updateSourceText(cached, "正在检查今日 BTC 价格缺口...");
-      render();
+      const isInitialLoad = !data.length;
+      if (isInitialLoad) {
+        data = buildSeries(mergePrices(basePrices, readLiveCache()));
+        resetViewAfterDataChange();
+        render();
+      }
+      updateSourceText(cached, "正在获取最新 BTC 价格...");
 
       try {
         const latestBeforeFetch = data[data.length - 1].t;
         const livePrices = await fetchMissingPrices(latestBeforeFetch);
-        if (livePrices.length) {
-          const mergedLiveCache = mergePrices(readLiveCache(), livePrices);
-          writeLiveCache(mergedLiveCache);
-          data = buildSeries(mergePrices(basePrices, mergedLiveCache));
-          resetViewAfterDataChange();
-          updateSourceText(cached, `已自动补齐 ${livePrices.length} 天最新 BTC 日线。`);
-          render();
-        } else {
-          updateSourceText(cached, "已是最新日线。");
-        }
+        const mergedLiveCache = mergePrices(readLiveCache(), livePrices);
+        writeLiveCache(mergedLiveCache);
+        const previousData = data;
+        data = buildSeries(mergePrices(basePrices, mergedLiveCache));
+        resetViewAfterDataChange(isInitialLoad ? undefined : previousData);
+        const latest = data[data.length - 1];
+        const updatedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+        updateSourceText(cached, `BTC $${latest.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · 价格更新于 ${updatedAt} · 每分钟自动刷新。`);
+        render();
       } catch (error) {
-        updateSourceText(cached, `最新 BTC 日线补齐失败：${error.message}`);
+        updateSourceText(cached, `最新 BTC 价格更新失败，保留缓存价格：${error.message}。一分钟后重试，也可手动刷新。`);
+      } finally {
+        priceRefreshInFlight = false;
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = "刷新价格";
       }
     }
 
@@ -621,8 +636,12 @@
       });
     }
 
-    function resetViewAfterDataChange() {
-      const oldSelectedDate = selectedIndex === null || !data[selectedIndex] ? null : data[selectedIndex].t;
+    function resetViewAfterDataChange(previousData) {
+      const oldData = previousData || data;
+      const oldSelectedDate = selectedIndex === null || !oldData[selectedIndex] ? null : oldData[selectedIndex].t;
+      const oldStartDate = previousData?.[viewStart]?.t;
+      const oldEndDate = previousData?.[viewEnd]?.t;
+      const wasAtLatest = previousData && viewEnd === previousData.length - 1;
       const latest = data[data.length - 1];
       const zone = zoneForAhr(latest.ahr999);
       currentAhrEl.textContent = latest.ahr999.toFixed(4);
@@ -630,17 +649,23 @@
       currentZoneEl.className = `zone-badge ${zone.className}`;
       viewEnd = data.length - 1;
       viewStart = defaultRecentStart();
+      if (previousData) {
+        const startIndex = data.findIndex(item => item.t >= oldStartDate);
+        const endIndex = data.findIndex(item => item.t >= oldEndDate);
+        if (startIndex !== -1) viewStart = startIndex;
+        if (!wasAtLatest && endIndex !== -1) viewEnd = endIndex;
+      }
       if (oldSelectedDate !== null) {
         const nextSelected = data.findIndex(item => item.t >= oldSelectedDate);
         selectedIndex = nextSelected === -1 ? null : nextSelected;
       }
-      applyInitialSelection();
+      if (!previousData) applyInitialSelection();
     }
 
     function updateSourceText(hasStaticCache, suffix) {
       const latest = data[data.length - 1];
       const staticSource = hasStaticCache ? window.BTC_PRICE_HISTORY.source : "内置演示曲线";
-      sourceTextEl.textContent = `数据源：${staticSource} + 打开页面自动补齐最新日线；范围 ${dateLabel(data[0].t)} 至 ${dateLabel(latest.t)}。${suffix}`;
+      sourceTextEl.textContent = `数据源：${staticSource} + 自动补齐日线并更新今日价格；范围 ${dateLabel(data[0].t)} 至 ${dateLabel(latest.t)}。${suffix}`;
     }
 
     function mergePrices(...groups) {
@@ -688,15 +713,16 @@
     }
 
     async function fetchMissingPrices(latestTimestamp) {
-      const from = dayStart(latestTimestamp) + DAY;
       const to = todayStart();
-      if (from > to) return [];
+      // Re-fetch yesterday's final close and today's still-changing candle.
+      const from = Math.min(dayStart(latestTimestamp), to) - DAY;
       const providers = [fetchFromKraken, fetchFromBinance, fetchFromCoinGecko];
       const errors = [];
       for (const provider of providers) {
         try {
           const result = await provider(from, to);
-          if (result.length) return result;
+          if (result.some(item => item.t === to)) return result;
+          errors.push(`${provider.name.replace("fetchFrom", "")} 未返回今日价格`);
         } catch (error) {
           errors.push(error.message);
         }
@@ -736,7 +762,7 @@
       const url = new URL("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range");
       url.searchParams.set("vs_currency", "usd");
       url.searchParams.set("from", String(Math.floor(from / 1000)));
-      url.searchParams.set("to", String(Math.floor((to + DAY - 1) / 1000)));
+      url.searchParams.set("to", String(Math.floor(Date.now() / 1000)));
       const json = await fetchJson(url);
       if (!Array.isArray(json.prices)) throw new Error("CoinGecko 返回格式异常");
       const daily = new Map();
@@ -756,7 +782,7 @@
       try {
         const response = await fetch(target.toString(), { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw new Error(`${target.hostname} HTTP ${response.status}`);
-        return response.json();
+        return await response.json();
       } catch (error) {
         if (error.name === "AbortError") throw new Error(`${target.hostname} 请求超时`);
         throw error;
@@ -1167,6 +1193,14 @@
       viewStart = defaultRecentStart();
       selectedIndex = null;
       render();
+    });
+
+    refreshBtn.addEventListener("click", loadData);
+    setInterval(() => {
+      if (!document.hidden) loadData();
+    }, REFRESH_INTERVAL);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) loadData();
     });
 
     window.addEventListener("resize", render);
